@@ -1,0 +1,9 @@
+click==8.1.8
+Deprecated==1.2.18
+networkx==2.8.8
+tabulate==0.8.10
+tsplib95==0.7.1
+wrapt==1.17.2
+
+numpy~=2.2.5
+pydantic~=2.11.3

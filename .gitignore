@@ -9,3 +9,8 @@
 !ant-colony.py
 !ant.py
 !environment.py
+
+!requirements.txt
+!graphs
+!data
+!analytics.py

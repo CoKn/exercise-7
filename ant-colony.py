@@ -1,9 +1,15 @@
-import numpy as np
+import json
+from pathlib import Path
+from typing import List, Tuple
+
+import random
+
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from environment import Environment
 from ant import Ant 
 
-# Class representing the ant colony
+
 """
     ant_population: the number of ants in the ant colony
     iterations: the number of iterations 
@@ -11,52 +17,96 @@ from ant import Ant
     beta: a parameter controlling the influence of the distance to the next node during ants' path selection process
     rho: pheromone evaporation rate
 """
-class AntColony:
-    def __init__(self, ant_population: int, iterations: int, alpha: float, beta: float, rho: float):
-        self.ant_population = ant_population
-        self.iterations = iterations
-        self.alpha = alpha
-        self.beta = beta
-        self.rho = rho 
+class AntColony(BaseModel):
+    ant_population: int = Field(..., gt=0, description="Number of ants")
+    iterations: int = Field(..., gt=0, description="Number of iterations")
+    alpha: float = Field(..., gt=0, description="Pheromone exponent")
+    beta: float = Field(..., gt=0, description="Heuristic exponent")
+    rho: float = Field(..., gt=0, lt=1, description="Pheromone evaporation rate")
+    problem_path: Path = Field(..., description="Path to .tsp instance file")
 
-        # Initialize the environment of the ant colony
-        self.environment = Environment(self.rho)
+    # Private attributes
+    _environment: Environment = PrivateAttr()
+    _ants: List[Ant] = PrivateAttr()
 
-        # Initilize the list of ants of the ant colony
-        self.ants = []
+    class Config:
+        arbitrary_types_allowed = True
 
-        # Initialize the ants of the ant colony
-        for i in range(ant_population):
-            
-            # Initialize an ant on a random initial location 
-            ant = Ant(self.alpha, self.beta, None)
+    @field_validator('problem_path')
+    def validate_path(cls, v: Path) -> Path:
+        if not v.is_file():
+            raise ValueError(f"File not found at: {v}")
+        return v
 
-            # Position the ant in the environment of the ant colony so that it can move around
-            ant.join(self.environment)
-        
-            # Add the ant to the ant colony
-            self.ants.append(ant)
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._environment = Environment(rho=self.rho, problem_path=self.problem_path)
+        self._environment.initialize_pheromone_map(num_ants=self.ant_population)
+        self._ants = []
+        for _ in range(self.ant_population):
+            start = random.choice(self._environment.get_possible_locations())
+            ant = Ant(alpha=self.alpha, beta=self.beta, initial_location=start)
+            ant.join(self._environment)
+            self._ants.append(ant)
 
-    # Solve the ant colony optimization problem  
-    def solve(self):
+    def solve(self) -> Tuple[List[int], float, List[dict]]:
+        """
+        Run the Ant System algorithm, returning the best tour, its length, and all routes.
+        """
+        best_solution: List[int] = []
+        shortest_distance: float = float('inf')
+        routes: List[dict] = []
 
-        # The solution will be a list of the visited cities
-        solution = []
+        for iteration in range(self.iterations):
+            for ant in self._ants:
+                # randomize start each iteration
+                start = random.choice(self._environment.get_possible_locations())
+                ant.initial_location = start
+                ant.join(self._environment)
+                tour, dist = ant.run(return_to_start=True)
+                routes.append({
+                    'iteration': iteration,
+                    'tour': tour,
+                    'distance': dist
+                })
+                if dist < shortest_distance:
+                    shortest_distance = dist
+                    best_solution = tour.copy()
 
-        # Initially, the shortest distance is set to infinite
-        shortest_distance = np.inf
+            # pheromone update
+            self._environment.pheromone_evaporation()
+            deposits = [(ant._path, ant._traveled_distance) for ant in self._ants]
+            self._environment.pheromone_addition(deposits)
 
-        return solution, shortest_distance
+        return best_solution, shortest_distance, routes
 
+    def save_routes(self, path: Path) -> None:
+        """Save collected routes to a JSON file."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'w') as f:
+            json.dump(self.solve()[2], f)
 
 def main():
-    # Intialize the ant colony
-    ant_colony = AntColony(1, None, None, None, None)
+    alphas = [2]
+    betas = [5]
+    rhos = [0.3]
 
-    # Solve the ant colony optimization problem
-    solution, distance = ant_colony.solve()
-    print("Solution: ", solution)
-    print("Distance: ", distance)
+    for alpha in alphas:
+        for beta in betas:
+            for rho in rhos:
+                ant_colony = AntColony(ant_population=20,
+                                       iterations=20,
+                                       alpha=alpha,
+                                       beta=beta,
+                                       rho=rho,
+                                       problem_path=Path(f'./att48-specs/att48.tsp'))
+
+                # Solve the ant colony optimization problem
+                solution, distance, routes = ant_colony.solve()
+                print("Solution: ", solution)
+                print("Distance: ", distance)
+
+                ant_colony.save_routes(path=Path(f'data/test_refactoring_routes_10_alpha_{alpha}_beta_{beta}_rho_{rho}.json'))
 
 
 if __name__ == '__main__':
