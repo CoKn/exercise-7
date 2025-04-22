@@ -95,6 +95,11 @@ def load_optimal_tour(tour_file: Path) -> List[int]:
         raise ValueError(f"No tours found in {tour_file}")
     return tours[0]
 
+def are_cyclically_equivalent(list1, list2):
+    if len(list1) != len(list2):
+        return False
+    return any(list1 == list2[i:] + list2[:i] for i in range(len(list2)))
+
 def main():
     alphas = [2]
     betas = [5]
@@ -116,8 +121,8 @@ def main():
                 print("Distance: ", distance)
 
                 optimal_tour = load_optimal_tour(Path(f"./att48-specs/att48.opt.tour"))
-                # print(optimal_tour)
-                if solution == optimal_tour:
+                print(optimal_tour)
+                if are_cyclically_equivalent(solution, optimal_tour):
                     print("Found optimal tour!")
                     print(solution)
 
