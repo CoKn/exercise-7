@@ -4,6 +4,7 @@ from typing import List, Tuple
 
 import random
 
+import tsplib95
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from environment import Environment
@@ -86,6 +87,14 @@ class AntColony(BaseModel):
         with open(path, 'w') as f:
             json.dump(self.solve()[2], f)
 
+def load_optimal_tour(tour_file: Path) -> List[int]:
+    sol = tsplib95.load(str(tour_file))
+    # TSPLIB95 marks the loaded object’s type as 'TOUR' and populates `.tours`
+    tours = getattr(sol, "tours", None)
+    if not tours:
+        raise ValueError(f"No tours found in {tour_file}")
+    return tours[0]
+
 def main():
     alphas = [2]
     betas = [5]
@@ -95,7 +104,7 @@ def main():
         for beta in betas:
             for rho in rhos:
                 ant_colony = AntColony(ant_population=20,
-                                       iterations=20,
+                                       iterations=50,
                                        alpha=alpha,
                                        beta=beta,
                                        rho=rho,
@@ -106,8 +115,15 @@ def main():
                 print("Solution: ", solution)
                 print("Distance: ", distance)
 
-                ant_colony.save_routes(path=Path(f'data/test_refactoring_routes_10_alpha_{alpha}_beta_{beta}_rho_{rho}.json'))
+                optimal_tour = load_optimal_tour(Path(f"./att48-specs/att48.opt.tour"))
+                # print(optimal_tour)
+                if solution == optimal_tour:
+                    print("Found optimal tour!")
+                    print(solution)
+
+                # ant_colony.save_routes(path=Path(f'data/test_refactoring_routes_10_alpha_{alpha}_beta_{beta}_rho_{rho}.json'))
+
 
 
 if __name__ == '__main__':
-    main()    
+    main()

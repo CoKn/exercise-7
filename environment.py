@@ -20,7 +20,7 @@ class Environment(BaseModel):
     _graph: nx.Graph = PrivateAttr()
 
     class Config:
-        arbitrary_types_allowed = True  # allow tsplib95 and networkx types
+        arbitrary_types_allowed = True
 
     @field_validator('problem_path')
     def must_be_file(cls, v: Path) -> Path:
@@ -118,7 +118,6 @@ if __name__ == '__main__':
     print(f'Initialized tau0 = {tau0:.6f}')
     print(f'Number of nodes: {len(env.get_possible_locations())}')
     # sample pheromone and distance on edge (1,2)
-    print('Edge (1,2) weight, pheromone:',
-          env.get_edge_weight(1,2), env.get_pheromone(1,2))
+    print('Edge (1,2) weight, pheromone:', env.get_edge_weight(1,2), env.get_pheromone(1,2))
 
     
